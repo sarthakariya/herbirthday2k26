@@ -3,7 +3,6 @@ import { Cake } from './components/Cake';
 import { useBlowDetection } from './hooks/useBlowDetection';
 import Confetti from 'react-confetti';
 import { Sparkles, Mic, Music } from 'lucide-react';
-import { generateBirthdayMessage } from './services/geminiService';
 
 const TOTAL_CANDLES = 17;
 
@@ -12,7 +11,6 @@ const App: React.FC = () => {
   const [candlesLit, setCandlesLit] = useState<boolean[]>(Array(TOTAL_CANDLES).fill(true));
   const [isWon, setIsWon] = useState(false);
   const [birthdayMessage, setBirthdayMessage] = useState<string>("");
-  const [loadingMessage, setLoadingMessage] = useState(false);
   
   // Audio detection hook
   const { isBlowing, intensity, startAudio, stopAudio } = useBlowDetection();
@@ -59,23 +57,10 @@ const App: React.FC = () => {
     if (hasStarted && !isWon && candlesLit.every(lit => !lit)) {
       setIsWon(true);
       stopAudio();
-      fetchBirthdayMessage();
+      // Set the message directly here instead of using an API
+      setBirthdayMessage("Happy Birthday! 🎉 May your day be as sweet as this cake and filled with all the love you deserve! I love you! ❤️");
     }
   }, [candlesLit, hasStarted, isWon, stopAudio]);
-
-  const fetchBirthdayMessage = async () => {
-    if (!process.env.API_KEY) return;
-    setLoadingMessage(true);
-    try {
-      const message = await generateBirthdayMessage();
-      setBirthdayMessage(message);
-    } catch (error) {
-      console.error("Failed to fetch message", error);
-      setBirthdayMessage("Happy Birthday! May your day be as sweet as this cake! 🎂");
-    } finally {
-      setLoadingMessage(false);
-    }
-  };
 
   const { width, height } = useWindowSize();
 
@@ -109,13 +94,9 @@ const App: React.FC = () => {
              <h1 className="font-handwriting text-5xl md:text-7xl text-pink-600 mb-4 drop-shadow-sm">
                Happy Birthday!
              </h1>
-             {loadingMessage ? (
-               <p className="animate-pulse text-purple-600">Generating a special wish for you...</p>
-             ) : (
-               <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto italic bg-white/50 p-6 rounded-xl shadow-sm border border-pink-100">
-                 {birthdayMessage}
-               </p>
-             )}
+             <p className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto italic bg-white/50 p-6 rounded-xl shadow-sm border border-pink-100">
+               {birthdayMessage}
+             </p>
           </div>
 
           {/* Main Cake Area */}
