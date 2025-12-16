@@ -14,28 +14,28 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 
-    <!-- Babel for processing JSX in browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- LIBRARIES (Loaded as Globals) -->
+    <!-- 1. React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 2. Framer Motion -->
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    
+    <!-- 3. React Confetti -->
+    <script src="https://unpkg.com/react-confetti@6.1.0/dist/react-confetti.min.js"></script>
+    
+    <!-- 4. Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
 
-    <!-- Import Map for external libraries -->
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "framer-motion": "https://esm.sh/framer-motion@10.16.4",
-    "react-confetti": "https://esm.sh/react-confetti@6.1.0",
-    "lucide-react": "https://esm.sh/lucide-react@0.263.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
+    <!-- 5. Babel (To translate the script below) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body class="bg-pink-50 text-slate-800 antialiased overflow-hidden">
     <div id="root"></div>
     
-    <!-- Main Script (type="text/babel" handles JSX) -->
-    <script type="text/babel" data-type="module" src="script.js"></script>
+    <!-- Load our script with type="text/babel" so Babel translates it -->
+    <script type="text/babel" src="script.js"></script>
   </body>
 </html>
