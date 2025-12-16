@@ -14,28 +14,24 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 
-    <!-- LIBRARIES (Loaded as Globals) -->
-    <!-- 1. React & ReactDOM -->
+    <!-- LIBRARIES -->
+    <!-- React & ReactDOM (UMD for browser) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- 2. Framer Motion -->
+    <!-- Framer Motion -->
     <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
     
-    <!-- 3. React Confetti -->
+    <!-- React Confetti -->
     <script src="https://unpkg.com/react-confetti@6.1.0/dist/react-confetti.min.js"></script>
     
-    <!-- 4. Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
-
-    <!-- 5. Babel (To translate the script below) -->
+    <!-- Babel (Compiles JSX in browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body class="bg-pink-50 text-slate-800 antialiased overflow-hidden">
     <div id="root"></div>
     
-    <!-- Load our script with type="text/babel" so Babel translates it -->
+    <!-- Main Script -->
     <script type="text/babel" src="script.js"></script>
   </body>
 </html>
