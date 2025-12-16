@@ -1,42 +1,22 @@
 // --- GLOBALS ---
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const { motion, AnimatePresence } = window.Motion;
 const Confetti = window.ReactConfetti;
 
-// --- ICONS (Inlined to avoid loading errors) ---
-const SparklesIcon = ({ size = 24, className = "" }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-  </svg>
-);
-
+// --- ICONS ---
 const MicIcon = ({ size = 24, className = "" }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
     <line x1="12" x2="12" y1="19" y2="22"/>
+  </svg>
+);
+
+const MusicIcon = ({ size = 24, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9 18V5l12-2v13"/>
+    <circle cx="6" cy="18" r="3"/>
+    <circle cx="18" cy="16" r="3"/>
   </svg>
 );
 
@@ -58,8 +38,8 @@ const playPuffSound = () => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     
-    // Noise buffer for "puff" sound
-    const bufferSize = ctx.sampleRate * 0.1;
+    // Create a quick "white noise" burst for a puff sound
+    const bufferSize = ctx.sampleRate * 0.1; // 0.1 seconds
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
@@ -71,13 +51,14 @@ const playPuffSound = () => {
     
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(800, t);
+    filter.frequency.setValueAtTime(1000, t); // Muffled sound
+    filter.frequency.linearRampToValueAtTime(100, t + 0.1);
     
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
     
-    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.setValueAtTime(0.4, t);
     gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
     
     noise.start(t);
@@ -92,14 +73,20 @@ const playWinTune = () => {
     if (ctx.state === 'suspended') ctx.resume();
 
     const now = ctx.currentTime;
-    // "Happy Birthday to You" notes (simplified)
+    // Classic "Happy Birthday" opening notes
     const melody = [
-      { f: 261.63, d: 0.25 }, // C4
-      { f: 261.63, d: 0.25 }, // C4
-      { f: 293.66, d: 0.5 },  // D4
-      { f: 261.63, d: 0.5 },  // C4
-      { f: 349.23, d: 0.5 },  // F4
-      { f: 329.63, d: 1.0 },  // E4
+      { f: 261.63, d: 0.25 }, // Happy
+      { f: 261.63, d: 0.25 }, // Birth
+      { f: 293.66, d: 0.5 },  // Day
+      { f: 261.63, d: 0.5 },  // To
+      { f: 349.23, d: 0.5 },  // You
+      { f: 329.63, d: 1.0 },  // (Pause)
+      { f: 261.63, d: 0.25 }, // Happy
+      { f: 261.63, d: 0.25 }, // Birth
+      { f: 293.66, d: 0.5 },  // Day
+      { f: 261.63, d: 0.5 },  // To
+      { f: 392.00, d: 0.5 },  // You
+      { f: 349.23, d: 1.0 },  // ...
     ];
 
     let t = now;
@@ -107,11 +94,12 @@ const playWinTune = () => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
-      osc.type = 'triangle'; // Softer sound
+      osc.type = 'triangle'; 
       osc.frequency.value = f;
       
-      gain.gain.setValueAtTime(0.1, t);
-      gain.gain.linearRampToValueAtTime(0.1, t + d - 0.05);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.05);
+      gain.gain.setValueAtTime(0.15, t + d - 0.05);
       gain.gain.linearRampToValueAtTime(0, t + d);
       
       osc.connect(gain);
@@ -144,7 +132,8 @@ const useBlowDetection = () => {
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
 
-      analyser.fftSize = 512;
+      // Higher FFT size for better resolution
+      analyser.fftSize = 2048;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
 
@@ -159,22 +148,22 @@ const useBlowDetection = () => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArrayRef.current);
         
-        // Calculate average volume (amplitude)
         let sum = 0;
-        // Focus on lower frequencies where breath wind noise usually is
-        const lowFreqCount = Math.floor(dataArrayRef.current.length / 3);
+        // Blowing creates a lot of low-end noise. We focus on the lower spectrum.
+        const lowFreqCount = Math.floor(dataArrayRef.current.length * 0.2); 
         for (let i = 0; i < lowFreqCount; i++) {
           sum += dataArrayRef.current[i];
         }
         const average = sum / lowFreqCount;
 
-        // Threshold for "blowing"
-        const THRESHOLD = 50; 
+        // LOWER THRESHOLD = More sensitive
+        const THRESHOLD = 35; 
         
         if (average > THRESHOLD) {
           setIsBlowing(true);
-          // Map intensity 0-1 based on volume
-          setIntensity(Math.min((average - THRESHOLD) / 100, 1));
+          // Intensity 0.0 to 1.0 based on how loud the blow is
+          const calculatedIntensity = Math.min((average - THRESHOLD) / 60, 1);
+          setIntensity(calculatedIntensity);
         } else {
           setIsBlowing(false);
           setIntensity(0);
@@ -191,10 +180,7 @@ const useBlowDetection = () => {
 
   const stopAudio = useCallback(() => {
     if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-    if (sourceRef.current) {
-        // Just disconnect, don't close context so we can play sound effects
-        sourceRef.current.disconnect();
-    }
+    if (sourceRef.current) sourceRef.current.disconnect();
     setIsBlowing(false);
   }, []);
 
@@ -207,55 +193,110 @@ const useBlowDetection = () => {
 
 // --- COMPONENTS ---
 
-const Candle = ({ isLit, index }) => {
-  // Pastel candle colors
-  const colors = [
-    'bg-red-300', 'bg-orange-300', 'bg-amber-300', 
-    'bg-yellow-300', 'bg-lime-300', 'bg-green-300', 
-    'bg-teal-300', 'bg-cyan-300', 'bg-sky-300', 
-    'bg-blue-300', 'bg-indigo-300', 'bg-violet-300', 
-    'bg-purple-300', 'bg-fuchsia-300', 'bg-pink-300', 'bg-rose-300'
-  ];
-  const color = colors[index % colors.length];
+const RoomDecorations = () => {
+  // Generate random balloons
+  const balloons = useMemo(() => Array.from({ length: 8 }).map((_, i) => ({
+    id: i,
+    color: ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400'][i % 5],
+    left: Math.random() * 100,
+    delay: Math.random() * 5,
+    duration: 10 + Math.random() * 10
+  })), []);
 
   return (
-    <div className="flex flex-col items-center relative mx-[2px] mb-[-4px] z-10">
-      {/* Flame */}
-      <div className="h-6 w-4 relative flex justify-center items-end">
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {/* Wall Color */}
+      <div className="absolute inset-0 bg-gradient-to-b from-purple-50 to-pink-50 opacity-80"></div>
+      
+      {/* Bunting / Flags */}
+      <div className="absolute top-0 left-0 w-full h-16 flex justify-between overflow-hidden">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <div 
+            key={i} 
+            className={`w-12 h-12 -mt-6 transform rotate-45 ${['bg-red-300', 'bg-blue-300', 'bg-yellow-300', 'bg-green-300'][i % 4]} rounded-sm shadow-sm`}
+            style={{ marginLeft: -10 }}
+          ></div>
+        ))}
+      </div>
+
+      {/* Floating Balloons */}
+      {balloons.map((b) => (
+        <motion.div
+          key={b.id}
+          initial={{ y: '120vh', x: 0 }}
+          animate={{ 
+            y: '-20vh', 
+            x: [0, 20, -20, 0] // Swaying motion
+          }}
+          transition={{ 
+            y: { duration: b.duration, repeat: Infinity, ease: "linear", delay: b.delay },
+            x: { duration: 5, repeat: Infinity, ease: "easeInOut" }
+          }}
+          className={`absolute bottom-0 w-16 h-20 rounded-t-full rounded-b-[50%] ${b.color} opacity-60 shadow-lg`}
+          style={{ left: `${b.left}%` }}
+        >
+          {/* Balloon String */}
+          <div className="absolute bottom-[-20px] left-1/2 w-[1px] h-6 bg-slate-400"></div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+const Candle = ({ isLit, index }) => {
+  const colors = [
+    'bg-rose-400', 'bg-blue-400', 'bg-emerald-400', 'bg-violet-400', 'bg-amber-400'
+  ];
+  const stripeColors = [
+    'bg-rose-200', 'bg-blue-200', 'bg-emerald-200', 'bg-violet-200', 'bg-amber-200'
+  ];
+  
+  const color = colors[index % colors.length];
+  const stripe = stripeColors[index % colors.length];
+
+  return (
+    <div className="flex flex-col items-center relative mx-[1px] mb-[-6px] z-50">
+      {/* Flame Area */}
+      <div className="h-8 w-4 relative flex justify-center items-end pb-1">
         {isLit && (
           <motion.div
-            initial={{ scale: 0 }}
+            initial={{ scale: 0, opacity: 0 }}
             animate={{ 
-              scale: [1, 1.2, 0.9, 1.1, 1],
-              rotate: [-5, 5, -2, 2, 0],
-              opacity: [0.9, 1, 0.8, 1],
+              scale: [1, 1.2, 0.8, 1.1, 1], // Flicker scale
+              opacity: [0.8, 1, 0.7, 1, 0.8], // Flicker brightness
+              rotate: [-2, 2, -1, 1, 0], // Flicker movement
             }}
             transition={{
-              duration: 0.4 + Math.random() * 0.2,
+              duration: 0.3 + Math.random() * 0.2, // Randomize speed
               repeat: Infinity,
               ease: "easeInOut"
             }}
-            className="w-3 h-5 bg-gradient-to-t from-orange-500 via-yellow-400 to-white rounded-full shadow-[0_0_10px_2px_rgba(255,165,0,0.6)] origin-bottom"
+            className="w-3 h-5 bg-gradient-to-t from-orange-600 via-amber-400 to-yellow-100 rounded-[50%] rounded-t-[50%] shadow-[0_0_15px_3px_rgba(255,165,0,0.5)] origin-bottom"
           >
+            {/* Inner blue flame */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full opacity-60 blur-[1px]"></div>
           </motion.div>
         )}
+        
+        {/* Smoke when extinguished */}
         {!isLit && (
            <motion.div 
-             initial={{ opacity: 1, y: 0 }}
-             animate={{ opacity: 0, y: -20 }}
-             transition={{ duration: 1 }}
-             className="absolute bottom-0 text-gray-400 font-bold text-xs"
-           >
-             ~
-           </motion.div>
+             initial={{ opacity: 1, y: 0, scale: 1 }}
+             animate={{ opacity: 0, y: -30, scale: 2 }}
+             transition={{ duration: 1.5 }}
+             className="absolute bottom-0 w-2 h-2 bg-gray-400 rounded-full blur-sm"
+           />
         )}
       </div>
 
-      {/* Wax */}
-      <div className={`w-2.5 h-10 ${color} rounded-sm relative border border-black/5 shadow-inner`}>
-          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-[1px] h-1.5 bg-black/50"></div>
-          {/* Stripes */}
-          <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.3)_4px,rgba(255,255,255,0.3)_6px)]"></div>
+      {/* Candle Body */}
+      <div className={`w-3 h-10 ${color} rounded-sm relative border border-black/10 shadow-sm overflow-hidden`}>
+         {/* Stripes */}
+         <div className={`absolute top-2 w-full h-1.5 ${stripe} -rotate-12 scale-110`}></div>
+         <div className={`absolute top-5 w-full h-1.5 ${stripe} -rotate-12 scale-110`}></div>
+         <div className={`absolute top-8 w-full h-1.5 ${stripe} -rotate-12 scale-110`}></div>
+         {/* Wick */}
+         <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-[1.5px] h-2 bg-black/70"></div>
       </div>
     </div>
   );
@@ -263,57 +304,83 @@ const Candle = ({ isLit, index }) => {
 
 const Cake = ({ candlesLit }) => {
   return (
-    <div className="relative flex flex-col items-center select-none mt-20 md:scale-125 transition-transform">
+    <div className="relative flex flex-col items-center select-none mt-20 md:scale-125 transition-transform drop-shadow-2xl">
       
-      {/* 17 Candles placed on top */}
-      <div className="absolute bottom-[205px] z-30 flex flex-wrap justify-center w-[220px] px-2">
+      {/* --- CANDLES --- */}
+      {/* Positioned explicitly to sit ON TOP of the top layer */}
+      <div className="absolute bottom-[230px] z-40 flex flex-wrap justify-center items-end w-[240px] gap-1 perspective-[100px]">
         {candlesLit.map((isLit, i) => (
           <Candle key={i} isLit={isLit} index={i} />
         ))}
       </div>
 
-      {/* TOP LAYER (Pink) */}
-      <div className="w-56 h-20 bg-pink-300 rounded-t-2xl relative z-20 shadow-lg border-b-4 border-pink-400/30 flex items-center justify-center">
-        {/* Frosting drips */}
-        <div className="absolute -top-1 w-full flex justify-center gap-1">
-             {[...Array(7)].map((_, i) => (
-               <div key={i} className="w-8 h-6 bg-pink-300 rounded-b-full shadow-sm"></div>
+      {/* --- TOP LAYER (Pink + Piping) --- */}
+      <div className="w-60 h-24 bg-pink-300 rounded-t-lg relative z-30 shadow-lg border-b border-pink-400/20 flex flex-col items-center">
+        
+        {/* Frosting Piping on Top Edge */}
+        <div className="absolute -top-3 w-full flex justify-between px-1">
+          {Array.from({length: 14}).map((_, i) => (
+            <div key={i} className="w-5 h-5 bg-white rounded-full shadow-sm -ml-1 border-b-2 border-pink-100"></div>
+          ))}
+        </div>
+
+        {/* Drips */}
+        <div className="absolute top-0 w-full flex justify-around px-2 z-10">
+             {[...Array(6)].map((_, i) => (
+               <div key={i} className="w-6 h-10 bg-white/90 rounded-b-full shadow-sm" style={{height: 20 + Math.random() * 20 + 'px'}}></div>
              ))}
         </div>
-        {/* Sprinkles */}
-        {[...Array(15)].map((_, i) => (
-           <div key={i} className="absolute w-1.5 h-1.5 rounded-full" 
-                style={{ 
-                  backgroundColor: ['#fff', '#ff0', '#0ff'][i%3],
-                  top: Math.random() * 60 + 20 + '%',
-                  left: Math.random() * 80 + 10 + '%'
-                }}></div>
-        ))}
-      </div>
 
-      {/* MIDDLE LAYER (White/Cream) */}
-      <div className="w-72 h-24 bg-yellow-50 relative z-10 shadow-md -mt-1 rounded-lg border-b-4 border-yellow-100 flex items-center justify-center">
-        {/* Filling Line */}
-        <div className="w-full h-2 bg-pink-200/50 absolute top-1/2"></div>
-        {/* Decorative dots */}
-        <div className="absolute w-full flex justify-between px-4">
-           {[...Array(6)].map((_, i) => (
-             <div key={i} className="w-3 h-3 bg-pink-400 rounded-full opacity-60"></div>
-           ))}
+        {/* Sprinkles */}
+        <div className="w-full h-full overflow-hidden relative rounded-t-lg">
+          {[...Array(30)].map((_, i) => (
+             <div key={i} className="absolute w-1.5 h-1.5 rounded-full shadow-sm opacity-80" 
+                  style={{ 
+                    backgroundColor: ['#FF6B6B', '#4ECDC4', '#FFE66D', '#FFFFFF'][i % 4],
+                    top: Math.random() * 80 + 10 + '%',
+                    left: Math.random() * 90 + 5 + '%'
+                  }}></div>
+          ))}
         </div>
       </div>
 
-      {/* BOTTOM LAYER (Chocolate) */}
-      <div className="w-80 h-28 bg-amber-700 relative z-0 shadow-xl -mt-1 rounded-b-2xl flex flex-col items-center justify-center">
-         <div className="absolute inset-0 bg-gradient-to-r from-amber-800 to-amber-700 rounded-b-2xl"></div>
-         <span className="relative z-10 font-handwriting text-amber-100 text-3xl opacity-80 rotate-[-2deg]">Happy Birthday</span>
+      {/* --- MIDDLE LAYER (White/Cream + Ribbon) --- */}
+      <div className="w-72 h-28 bg-yellow-50 relative z-20 shadow-md -mt-2 rounded-lg border-b border-yellow-100 flex items-center justify-center overflow-hidden">
+        
+        {/* Texture */}
+        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-20"></div>
+        
+        {/* Ribbon */}
+        <div className="w-full h-6 bg-purple-400 absolute top-1/2 -translate-y-1/2 shadow-sm border-y border-purple-500/20"></div>
+        <div className="w-8 h-8 bg-purple-500 absolute top-1/2 -translate-y-1/2 rounded-full shadow-md border-2 border-purple-300"></div>
       </div>
 
-      {/* PLATE */}
-      <div className="w-96 h-4 bg-slate-200 rounded-[50%] mt-1 shadow-2xl relative z-[-1] border border-slate-300"></div>
+      {/* --- BOTTOM LAYER (Chocolate + Texture) --- */}
+      <div className="w-80 h-32 bg-[#5D4037] relative z-10 shadow-xl -mt-2 rounded-b-3xl rounded-t-lg flex flex-col items-center justify-center overflow-hidden">
+         
+         {/* Chocolate Texture */}
+         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')]"></div>
+         
+         {/* Frosting Swirls (CSS) */}
+         <div className="absolute bottom-0 w-full h-12 flex items-end opacity-20">
+            {Array.from({length: 10}).map((_, i) => (
+              <div key={i} className="w-10 h-10 rounded-full border-t-4 border-white/50 -mb-5 mx-auto"></div>
+            ))}
+         </div>
+
+         <div className="relative z-10 text-center transform -rotate-2">
+            <span className="block font-handwriting text-amber-100 text-4xl drop-shadow-lg leading-tight">Happy</span>
+            <span className="block font-handwriting text-amber-100 text-4xl drop-shadow-lg leading-tight">Birthday</span>
+         </div>
+      </div>
+
+      {/* --- PLATE --- */}
+      <div className="w-[450px] h-6 bg-slate-100 rounded-[50%] mt-[-10px] shadow-[0_15px_30px_-5px_rgba(0,0,0,0.3)] relative z-0 border border-slate-200"></div>
     </div>
   );
 };
+
+// --- APP COMPONENT ---
 
 const App = () => {
   const TOTAL_CANDLES = 17;
@@ -333,7 +400,6 @@ const App = () => {
 
   // Handle start button
   const handleStart = async () => {
-    // Resume audio context on user gesture
     getAudioContext().resume();
     await startAudio();
     setHasStarted(true);
@@ -358,10 +424,12 @@ const App = () => {
         const litIndices = prev.map((lit, i) => lit ? i : -1).filter(i => i !== -1);
         if (litIndices.length === 0) return prev;
 
-        // The harder you blow (intensity), the more candles go out
-        const candlesToOut = Math.max(1, Math.ceil(intensity * 3)); 
-        const newCandles = [...prev];
+        // Increased sensitivity: Blow out more candles per frame based on intensity
+        const baseAmount = 1;
+        const extraAmount = Math.ceil(intensity * 5); // Up to 5 extra candles at max intensity
+        const candlesToOut = Math.min(litIndices.length, baseAmount + extraAmount);
         
+        const newCandles = [...prev];
         for (let i = 0; i < candlesToOut; i++) {
           if (litIndices.length === 0) break;
           // Random candle goes out
@@ -380,84 +448,102 @@ const App = () => {
     if (hasStarted && !isWon && candlesLit.every(lit => !lit)) {
       setIsWon(true);
       stopAudio(); // Stop mic
-      setTimeout(() => playWinTune(), 600); // Play music
+      setTimeout(() => playWinTune(), 500); // Play music shortly after
     }
   }, [candlesLit, hasStarted, isWon, stopAudio]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-pink-50 overflow-hidden relative selection:bg-pink-200">
+    <div className="min-h-screen w-full relative overflow-hidden bg-pink-50 font-sans selection:bg-pink-200">
       
-      {/* Confetti when Won */}
-      {isWon && <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={400} recycle={false} />}
+      {/* Background Room Decorations */}
+      <RoomDecorations />
 
-      {/* Title / Message */}
-      <div className="absolute top-10 w-full text-center px-4 z-40">
-        <AnimatePresence mode="wait">
-          {!hasStarted ? (
-             <motion.h1 
-               key="intro"
-               initial={{ opacity: 0, y: -20 }}
-               animate={{ opacity: 1, y: 0 }}
-               className="font-handwriting text-5xl md:text-6xl text-pink-600 drop-shadow-sm"
-             >
-               Make a Wish...
-             </motion.h1>
-          ) : !isWon ? (
-             <motion.h2
-               key="blowing"
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               className="font-bold text-2xl text-pink-400 uppercase tracking-widest"
-             >
-               Blow on your screen! 🎤💨
-             </motion.h2>
-          ) : (
-             <motion.div
-               key="won"
-               initial={{ scale: 0.5, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               transition={{ type: "spring", bounce: 0.5 }}
-             >
-               <h1 className="font-handwriting text-6xl md:text-8xl text-pink-600 mb-4 drop-shadow-md">
-                 Happy Birthday!
-               </h1>
-               <p className="text-slate-600 text-lg md:text-xl max-w-lg mx-auto bg-white/80 p-4 rounded-xl shadow-sm border border-pink-100">
-                 "May your day be as sweet as this cake and filled with all the love you deserve! I love you! ❤️"
-               </p>
-             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Start Button Overlay */}
-      {!hasStarted && (
-        <motion.div 
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }}
-          className="absolute z-50 inset-0 flex items-center justify-center bg-white/30 backdrop-blur-sm"
-        >
-          <button 
-            onClick={handleStart}
-            className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full font-bold text-xl shadow-xl hover:scale-105 transition-transform active:scale-95"
-          >
-            <MicIcon /> Click to Start & Allow Mic
-          </button>
-        </motion.div>
+      {/* Confetti Blast (Only on Win) */}
+      {isWon && (
+        <Confetti 
+          width={windowSize.width} 
+          height={windowSize.height} 
+          numberOfPieces={800} 
+          recycle={false} 
+          gravity={0.2} 
+        />
       )}
 
-      {/* CAKE CONTAINER */}
-      <motion.div
-        animate={{ 
-          y: isWon ? 40 : 0,
-          scale: isWon ? 1.1 : 1 
-        }}
-        transition={{ duration: 1 }}
-        className="mt-20"
-      >
-        <Cake candlesLit={candlesLit} />
-      </motion.div>
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen py-10">
+        
+        {/* Header Message */}
+        <div className="text-center mb-4 min-h-[160px] flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            {!hasStarted ? (
+               <motion.div 
+                 key="intro"
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-pink-100 max-w-sm mx-4"
+               >
+                 <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4 text-pink-500">
+                    <MusicIcon size={32} />
+                 </div>
+                 <h1 className="font-handwriting text-4xl text-pink-600 mb-2">Birthday Surprise!</h1>
+                 <p className="text-slate-600 mb-6">A magical cake awaits. Enable your microphone to make a wish!</p>
+                 <button 
+                   onClick={handleStart}
+                   className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-bold shadow-lg hover:shadow-pink-500/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                 >
+                   <MicIcon size={20} /> Start
+                 </button>
+               </motion.div>
+            ) : !isWon ? (
+               <motion.div
+                 key="blowing"
+                 initial={{ scale: 0.8, opacity: 0 }}
+                 animate={{ scale: 1, opacity: 1 }}
+                 exit={{ scale: 0.8, opacity: 0 }}
+               >
+                  <h2 className="font-bold text-3xl text-pink-500 tracking-wider animate-pulse mb-2">
+                    BLOW ON THE SCREEN!
+                  </h2>
+                  <p className="text-pink-400 font-medium">Extinguish all candles 🎤🌬️</p>
+               </motion.div>
+            ) : (
+               <motion.div
+                 key="won"
+                 initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
+                 animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                 transition={{ type: "spring", bounce: 0.6 }}
+                 className="text-center"
+               >
+                 <h1 className="font-handwriting text-7xl md:text-9xl text-pink-600 mb-4 drop-shadow-xl stroke-white">
+                   Happy Birthday!
+                 </h1>
+                 <motion.div 
+                   initial={{ opacity: 0, y: 20 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   transition={{ delay: 0.5 }}
+                   className="bg-white/90 backdrop-blur p-6 rounded-xl shadow-2xl border-2 border-pink-200 max-w-lg mx-auto"
+                 >
+                   <p className="text-xl md:text-2xl text-slate-700 italic">
+                     "May your day be as sweet as this cake and filled with all the love you deserve! I love you! ❤️"
+                   </p>
+                 </motion.div>
+               </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
+        {/* The Cake */}
+        <motion.div
+          animate={{ 
+            y: isWon ? 50 : 0,
+            scale: isWon ? 1.05 : 1 
+          }}
+          transition={{ duration: 1.5, type: "spring" }}
+          className="mt-8"
+        >
+          <Cake candlesLit={candlesLit} />
+        </motion.div>
+
+      </div>
     </div>
   );
 };
