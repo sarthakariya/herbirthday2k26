@@ -3,6 +3,9 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const { motion, AnimatePresence } = window.Motion;
 const Confetti = window.ReactConfetti;
 
+// --- UTILS ---
+const randomRange = (min, max) => Math.random() * (max - min) + min;
+
 // --- ICONS ---
 const Icons = {
   Mic: ({ size = 24, className = "" }) => (
@@ -34,96 +37,75 @@ const getAudioContext = () => {
   return audioCtx;
 };
 
-// High-quality "Whoosh" sound for extinguishing
 const playExtinguishSound = () => {
   try {
     const ctx = getAudioContext();
     const t = ctx.currentTime;
     
-    // Noise burst
-    const bufferSize = ctx.sampleRate * 0.2;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1500, t);
-    filter.frequency.exponentialRampToValueAtTime(100, t + 0.15);
-    
+    // Low frequency "puff"
+    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+    gain.gain.setValueAtTime(0.5, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
     
-    noise.connect(filter);
-    filter.connect(gain);
+    osc.connect(gain);
     gain.connect(ctx.destination);
-    noise.start(t);
+    osc.start(t);
+    osc.stop(t + 0.15);
   } catch (e) { console.warn(e); }
 };
 
-// Elegant Orchestral Celebration
 const playCelebration = () => {
   try {
     const ctx = getAudioContext();
     const t = ctx.currentTime;
     
-    // A Major Chord arpeggio (A4, C#5, E5, A5)
-    const notes = [440, 554.37, 659.25, 880];
+    // Majestic Chord (C Major 7 + 9)
+    const freqs = [261.63, 329.63, 392.00, 493.88, 523.25, 587.33];
     
-    notes.forEach((freq, i) => {
+    freqs.forEach((f, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       osc.type = 'triangle';
-      osc.frequency.value = freq;
+      osc.frequency.value = f;
       
-      const start = t + (i * 0.1);
+      const start = t + (i * 0.05);
       gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.1, start + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 2.5);
+      gain.gain.linearRampToValueAtTime(0.15, start + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 4);
       
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(start);
-      osc.stop(start + 3);
+      osc.stop(start + 5);
     });
-    
-    // Add a bass note
-    const bass = ctx.createOscillator();
-    const bassGain = ctx.createGain();
-    bass.type = 'sine';
-    bass.frequency.value = 110; // A2
-    bassGain.gain.setValueAtTime(0.2, t);
-    bassGain.gain.exponentialRampToValueAtTime(0.001, t + 3);
-    bass.connect(bassGain);
-    bassGain.connect(ctx.destination);
-    bass.start(t);
-    bass.stop(t + 3);
-
   } catch (e) { console.warn(e); }
 };
 
-// --- HOOKS ---
-
+// --- MICROPHONE HOOK (LESS SENSITIVE) ---
 const useBlowDetection = () => {
   const [isBlowing, setIsBlowing] = useState(false);
-  const [intensity, setIntensity] = useState(0);
   const audioRef = useRef({ ctx: null, analyser: null, source: null, raf: null });
+  const [blowHistory, setBlowHistory] = useState([]);
 
   const startListening = useCallback(async () => {
     if (audioRef.current.ctx) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false 
+        } 
+      });
       const ctx = getAudioContext();
       const analyser = ctx.createAnalyser();
       const source = ctx.createMediaStreamSource(stream);
       
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.4; // Smooth out jitter
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
       
       audioRef.current = { ctx, analyser, source, stream };
@@ -132,299 +114,298 @@ const useBlowDetection = () => {
       const detect = () => {
         analyser.getByteFrequencyData(dataArray);
         
-        // Calculate energy in low-frequency range (wind noise)
-        // Bins 0-20 approx 0-800Hz
+        // Analyze lower frequencies (wind noise is mostly < 500Hz)
         let sum = 0;
-        const bins = 40;
-        for(let i=0; i<bins; i++) sum += dataArray[i];
-        const avg = sum / bins;
+        const binsToCheck = 20; // Lower bins
+        for(let i=0; i<binsToCheck; i++) sum += dataArray[i];
+        const avg = sum / binsToCheck;
         
-        // Thresholds
-        const TRIGGER = 45; 
-        const MAX = 100;
+        // HIGHER THRESHOLD for "Less Sensitive"
+        // Normal talking is usually 20-40 avg. Blowing directly is 80+.
+        const THRESHOLD = 65; 
         
-        if (avg > TRIGGER) {
+        if (avg > THRESHOLD) {
           setIsBlowing(true);
-          setIntensity(Math.min((avg - TRIGGER) / (MAX - TRIGGER), 1));
         } else {
           setIsBlowing(false);
-          setIntensity(0);
         }
         audioRef.current.raf = requestAnimationFrame(detect);
       };
       detect();
     } catch (e) {
-      console.error("Mic Access Failed", e);
+      console.error("Mic Error", e);
+      alert("Microphone access needed for the magic!");
     }
   }, []);
 
   const stopListening = useCallback(() => {
     if (audioRef.current.raf) cancelAnimationFrame(audioRef.current.raf);
-    if (audioRef.current.source) audioRef.current.source.disconnect();
-    // Don't close context to allow playing sounds later
+    if (audioRef.current.stream) audioRef.current.stream.getTracks().forEach(t => t.stop());
     setIsBlowing(false);
   }, []);
 
   useEffect(() => () => stopListening(), [stopListening]);
 
-  return { isBlowing, intensity, startListening, stopListening };
+  return { isBlowing, startListening, stopListening };
 };
 
-// --- DECORATIVE SUB-COMPONENTS ---
+// --- HIGH FIDELITY PARTICLE ENGINE (CANVAS) ---
+// This handles thousands of decorations without killing the DOM
+const DecorationsCanvas = () => {
+  const canvasRef = useRef(null);
 
-// Procedural Strawberry
-const Strawberry = ({ className, style }) => (
-  <div className={`relative w-6 h-8 ${className}`} style={style}>
-    {/* Body */}
-    <div className="absolute inset-0 bg-red-600 rounded-b-full rounded-t-xl shadow-inner overflow-hidden">
-      {/* Gloss */}
-      <div className="absolute top-1 left-1 w-full h-full bg-gradient-to-br from-white/30 to-transparent rounded-full transform scale-75 origin-top-left"></div>
-      {/* Seeds */}
-      {[...Array(10)].map((_, i) => (
-        <div key={i} className="absolute w-[2px] h-[3px] bg-yellow-200/60 rounded-full"
-          style={{ top: `${Math.random()*80 + 10}%`, left: `${Math.random()*80 + 10}%` }} />
-      ))}
-    </div>
-    {/* Leaves */}
-    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-4 flex justify-center">
-      <div className="w-2 h-3 bg-green-600 rounded-full -rotate-45"></div>
-      <div className="w-2 h-3 bg-green-500 rounded-full"></div>
-      <div className="w-2 h-3 bg-green-600 rounded-full rotate-45"></div>
-    </div>
-  </div>
-);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId;
+    let particles = [];
+    let balloons = [];
 
-// Procedural Pearl/Gold Ball
-const Pearl = ({ size = 10, color = "bg-yellow-200", className }) => (
-  <div 
-    className={`rounded-full shadow-md ${color} ${className}`} 
-    style={{ 
-      width: size, height: size,
-      backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), transparent 60%)',
-      boxShadow: '1px 1px 2px rgba(0,0,0,0.3)'
-    }} 
-  />
-);
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', resize);
+    resize();
 
-// --- MAIN COMPONENTS ---
+    // Particle Classes
+    class Sparkle {
+      constructor() {
+        this.reset();
+      }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2;
+        this.speedY = Math.random() * 0.5 - 0.2;
+        this.speedX = Math.random() * 0.5 - 0.25;
+        this.life = Math.random() * 100 + 50;
+        this.opacity = 0;
+        this.maxOpacity = Math.random() * 0.7 + 0.3;
+        this.color = `hsl(${Math.random() * 60 + 30}, 100%, 70%)`; // Gold/Yellow
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.life--;
+        
+        // Fade in/out
+        if (this.life > 50) {
+          if (this.opacity < this.maxOpacity) this.opacity += 0.01;
+        } else {
+          this.opacity -= 0.01;
+        }
 
-const Background = () => {
-  // Golden Bokeh Particles
-  const particles = useMemo(() => Array.from({ length: 40 }).map((_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 6 + 2,
-    duration: Math.random() * 10 + 10,
-    delay: Math.random() * 5
-  })), []);
+        if (this.life <= 0 || this.opacity < 0) this.reset();
+      }
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.opacity;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
-  return (
-    <div className="fixed inset-0 z-0 overflow-hidden bg-[#0f172a]">
-      {/* Gradient Mesh Base */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#2a1b3d,transparent_90%)] opacity-60"></div>
-      <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(to_bottom,transparent,rgba(0,0,0,0.4))]"></div>
-      
-      {/* Animated Particles */}
-      {particles.map(p => (
-        <motion.div
-          key={p.id}
-          className="absolute rounded-full bg-yellow-200 blur-[1px]"
-          style={{ 
-            left: `${p.x}%`, 
-            width: p.size, 
-            height: p.size,
-            opacity: Math.random() * 0.3 + 0.1 
-          }}
-          animate={{
-            y: [0, -100, 0],
-            opacity: [0.2, 0.5, 0.2]
-          }}
-          transition={{
-            duration: p.duration,
-            repeat: Infinity,
-            delay: p.delay,
-            ease: "linear"
-          }}
-        />
-      ))}
-    </div>
-  );
+    class Balloon {
+      constructor() {
+        this.reset(true);
+      }
+      reset(initial = false) {
+        this.x = Math.random() * canvas.width;
+        this.y = initial ? Math.random() * canvas.height : canvas.height + 100;
+        this.r = Math.random() * 20 + 15; // Radius
+        this.speed = Math.random() * 1 + 0.5;
+        this.sway = Math.random() * 20 + 10;
+        this.swaySpeed = Math.random() * 0.02 + 0.01;
+        this.offset = Math.random() * 1000;
+        this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+        this.stringLen = Math.random() * 40 + 20;
+      }
+      update(time) {
+        this.y -= this.speed;
+        this.x += Math.sin(time * this.swaySpeed + this.offset) * 0.5;
+        if (this.y < -150) this.reset();
+      }
+      draw() {
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = this.color;
+        
+        // Balloon Body
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, this.r, this.r * 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Shine
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(this.x - this.r*0.3, this.y - this.r*0.3, this.r/3, this.r/1.5, -0.5, 0, Math.PI*2);
+        ctx.fill();
+
+        // String
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.r * 1.2);
+        ctx.quadraticCurveTo(
+          this.x + Math.sin(Date.now() * 0.005) * 10, 
+          this.y + this.r * 1.2 + this.stringLen / 2,
+          this.x, 
+          this.y + this.r * 1.2 + this.stringLen
+        );
+        ctx.stroke();
+      }
+    }
+
+    // Initialize "thousands" (simulated by dense fast particles)
+    for(let i=0; i<150; i++) particles.push(new Sparkle());
+    for(let i=0; i<30; i++) balloons.push(new Balloon());
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const time = Date.now();
+
+      // Draw Particles (Dust/Magic)
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+
+      // Draw Balloons (Foreground & Background)
+      balloons.forEach(b => {
+        b.update(time);
+        b.draw();
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    animate();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
 };
+
+// --- CAKE COMPONENTS ---
 
 const Candle = ({ isLit, index }) => {
-  const [smoke, setSmoke] = useState([]);
-
-  // Trigger smoke when extinguished
-  useEffect(() => {
-    if (!isLit) {
-      // Spawn 3 smoke particles
-      const newSmoke = [1, 2, 3].map(i => ({ id: Date.now() + i, x: (Math.random()-0.5)*10 }));
-      setSmoke(newSmoke);
-    }
-  }, [isLit]);
-
-  // Elegant Color Palette for Candles (Pastel Metallics)
-  const styles = [
-    { body: 'bg-rose-300', stripe: 'bg-rose-100' },
-    { body: 'bg-blue-300', stripe: 'bg-blue-100' },
-    { body: 'bg-purple-300', stripe: 'bg-purple-100' },
-    { body: 'bg-emerald-300', stripe: 'bg-emerald-100' },
-    { body: 'bg-amber-300', stripe: 'bg-amber-100' },
-  ];
-  const style = styles[index % styles.length];
-
   return (
-    <div className="relative flex flex-col items-center mx-[2px] mb-[-5px] z-50 group">
-      {/* Flame & Wick Area */}
-      <div className="h-10 w-6 relative flex justify-center items-end pb-0.5">
-        
-        {/* The Flame */}
-        <AnimatePresence>
-          {isLit && (
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="absolute bottom-1"
-            >
-              {/* Core Flame with Glow */}
-              <div className="relative w-4 h-6 animate-flicker origin-bottom">
-                 <div className="absolute inset-0 bg-gradient-to-t from-orange-500 via-yellow-300 to-white rounded-[50%] rounded-t-[50%] blur-[1px] shadow-[0_0_20px_4px_rgba(255,180,0,0.6)]"></div>
-                 {/* Blue base */}
-                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full blur-[2px] opacity-80"></div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Smoke Particles */}
-        {smoke.map(s => (
-          <motion.div
-            key={s.id}
-            className="absolute bottom-2 w-2 h-2 bg-gray-400 rounded-full blur-sm"
-            initial={{ opacity: 0.6, y: 0, scale: 1 }}
-            animate={{ opacity: 0, y: -50, x: s.x, scale: 3 }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-            onAnimationComplete={() => setSmoke([])}
+    <div className="relative flex flex-col items-center mx-1 -mb-2 z-50 transition-all duration-300 transform">
+      {/* Flame */}
+      <div className="h-8 w-4 relative flex justify-center items-end">
+        {isLit ? (
+          <div className="w-4 h-6 animate-flicker origin-bottom relative">
+            <div className="absolute inset-0 bg-gradient-to-t from-orange-500 via-yellow-400 to-white rounded-full blur-[2px] shadow-[0_0_20px_5px_rgba(255,165,0,0.6)]"></div>
+          </div>
+        ) : (
+          // Smoke puff when out
+          <motion.div 
+            initial={{ opacity: 1, y: 0 }} 
+            animate={{ opacity: 0, y: -40 }} 
+            transition={{ duration: 2 }}
+            className="w-1 h-1 bg-gray-400 rounded-full blur-sm"
           />
-        ))}
-
-        {/* The Wick */}
-        <div className={`w-[2px] h-3 bg-black/60 ${isLit ? 'opacity-40' : 'opacity-90'} transition-opacity`}></div>
+        )}
+        <div className="absolute bottom-0 w-[2px] h-2 bg-black opacity-50"></div>
       </div>
 
-      {/* Candle Stick */}
-      <div className={`w-3.5 h-14 ${style.body} rounded-sm relative overflow-hidden shadow-[inset_-2px_0_5px_rgba(0,0,0,0.1),1px_1px_2px_rgba(0,0,0,0.2)]`}>
-        {/* Diagonal Stripes (Texture) */}
-        <div className={`absolute top-2 -left-1 w-[200%] h-1 ${style.stripe} -rotate-45 opacity-50`}></div>
-        <div className={`absolute top-6 -left-1 w-[200%] h-1 ${style.stripe} -rotate-45 opacity-50`}></div>
-        <div className={`absolute top-10 -left-1 w-[200%] h-1 ${style.stripe} -rotate-45 opacity-50`}></div>
-        
-        {/* Highlights for wax effect */}
-        <div className="absolute top-0 left-0.5 w-[2px] h-full bg-white/30 blur-[0.5px]"></div>
-      </div>
+      {/* Wax */}
+      <div 
+        className="w-3 h-12 rounded-sm shadow-[inset_-3px_0_4px_rgba(0,0,0,0.2)] bg-gradient-to-r from-pink-300 via-pink-400 to-pink-300"
+        style={{
+          background: `linear-gradient(90deg, 
+            ${['#ff9a9e', '#a18cd1', '#fad0c4'][index % 3]} 0%, 
+            rgba(255,255,255,0.4) 50%, 
+            ${['#ff9a9e', '#a18cd1', '#fad0c4'][index % 3]} 100%)`
+        }}
+      ></div>
     </div>
   );
 };
 
 const Cake = ({ candlesLit }) => {
   return (
-    <div className="relative mt-20 md:scale-125 transition-transform duration-700">
+    <div className="relative md:scale-125 transition-transform duration-700 select-none">
       
-      {/* CANDLE ARRAY */}
-      <div className="absolute bottom-[275px] left-1/2 -translate-x-1/2 z-40 flex flex-wrap justify-center items-end w-[280px] perspective-[500px]">
+      {/* --- CANDLES --- */}
+      <div className="absolute bottom-[230px] left-1/2 -translate-x-1/2 z-40 flex flex-wrap justify-center items-end w-[260px] perspective-[100px]">
         {candlesLit.map((isLit, i) => (
           <Candle key={i} isLit={isLit} index={i} />
         ))}
       </div>
 
-      {/* --- TOP LAYER (Strawberry Cream) --- */}
+      {/* --- TOP TIER (27th Feb) --- */}
       <div className="relative z-30 flex flex-col items-center">
-        {/* Cake Body */}
-        <div className="w-64 h-24 bg-[#ffb7b2] rounded-t-xl relative shadow-[inset_-10px_0_20px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.1)] overflow-visible">
+        <div className="w-56 h-20 bg-[#fff0f5] rounded-t-xl relative shadow-[inset_-5px_-5px_20px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.2)] overflow-visible">
+          {/* Top Surface */}
+          <div className="absolute -top-5 left-0 w-full h-10 bg-[#fff5f8] rounded-[50%] border-b border-white/50 shadow-sm"></div>
           
-          {/* Top Surface (Simulated 3D) */}
-          <div className="absolute -top-4 left-0 w-full h-8 bg-[#ffc1bc] rounded-[50%] border-b border-white/20"></div>
-
-          {/* Dripping Glaze */}
-          <div className="absolute top-[-5px] w-full flex justify-center gap-1 px-2 filter drop-shadow-sm">
-             {[...Array(9)].map((_, i) => (
-               <div key={i} className="w-6 h-12 bg-[#ff9e99] rounded-b-full" style={{ height: 25 + Math.random() * 20 }}></div>
+          {/* Dripping Chocolate */}
+          <div className="absolute -top-1 w-full flex justify-center gap-2 px-1">
+             {[...Array(8)].map((_, i) => (
+               <div key={i} className="w-6 h-10 bg-[#5d4037] rounded-b-full shadow-lg border-t border-[#795548]" style={{ height: 20 + Math.random() * 25 }}></div>
              ))}
           </div>
 
-          {/* Decorations: Strawberries & Pearls */}
-          <div className="absolute -top-6 w-full flex justify-around px-4 z-20">
-             <Strawberry className="-rotate-12 scale-90" />
-             <Pearl size={14} color="bg-white" className="mt-6" />
-             <Strawberry className="rotate-6 scale-110 translate-y-2" />
-             <Pearl size={16} color="bg-white" className="mt-5" />
-             <Strawberry className="-rotate-6 scale-95" />
+          <div className="absolute top-4 w-full text-center">
+            <span className="font-handwriting text-rose-400 text-xl opacity-80 rotate-[-5deg] block">27th Feb</span>
           </div>
-
-          {/* Texture Details */}
-          <div className="w-full h-full opacity-30 texture-sponge mix-blend-multiply"></div>
         </div>
       </div>
 
-      {/* --- MIDDLE LAYER (Vanilla & Gold) --- */}
-      <div className="relative z-20 flex flex-col items-center -mt-3">
-        <div className="w-80 h-28 bg-[#fdf5e6] rounded-xl relative shadow-[inset_-10px_0_25px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.15)] flex items-center justify-center">
-           
+      {/* --- MIDDLE TIER (Reechita) --- */}
+      <div className="relative z-20 flex flex-col items-center -mt-4">
+        <div className="w-72 h-28 bg-[#f8bbd0] rounded-xl relative shadow-[inset_-10px_0_30px_rgba(0,0,0,0.15),0_15px_30px_rgba(0,0,0,0.2)] flex items-center justify-center">
            {/* Top Rim */}
-           <div className="absolute -top-4 w-full h-8 bg-[#fffcf5] rounded-[50%] shadow-sm"></div>
-
-           {/* Quilted Pattern using Gradients */}
-           <div className="absolute inset-0 opacity-40 bg-[linear-gradient(45deg,transparent_48%,#e0d5b5_49%,#e0d5b5_51%,transparent_52%),linear-gradient(-45deg,transparent_48%,#e0d5b5_49%,#e0d5b5_51%,transparent_52%)] [background-size:20px_20px]"></div>
-
-           {/* Gold Pearls at intersections */}
-           <div className="absolute inset-0 flex flex-wrap content-center justify-center gap-6 opacity-80 px-4 py-6">
-              {[...Array(12)].map((_,i) => <Pearl key={i} size={6} color="bg-yellow-400" />)}
+           <div className="absolute -top-5 w-full h-10 bg-[#fce4ec] rounded-[50%] shadow-sm"></div>
+           
+           {/* NAME PLATE */}
+           <div className="relative z-10 bg-white/30 backdrop-blur-sm px-6 py-2 rounded-full border border-white/40 shadow-lg transform rotate-[-2deg]">
+             <h1 className="font-handwriting text-4xl icing-text tracking-wide text-pink-600">Reechita</h1>
            </div>
 
-           {/* Center Ribbon */}
-           <div className="absolute w-full h-8 bg-purple-100/30 backdrop-blur-sm border-y border-purple-200/50 shadow-sm top-1/2 -translate-y-1/2 flex items-center justify-center overflow-hidden">
-              <div className="w-full h-[1px] bg-purple-300"></div>
+           {/* Decorative Pearls */}
+           <div className="absolute bottom-2 w-full flex justify-between px-6">
+              {[...Array(6)].map((_,i) => (
+                <div key={i} className="w-3 h-3 rounded-full bg-yellow-200 shadow-md"></div>
+              ))}
            </div>
         </div>
       </div>
 
-      {/* --- BOTTOM LAYER (Rich Chocolate) --- */}
-      <div className="relative z-10 flex flex-col items-center -mt-3">
-        <div className="w-96 h-36 bg-[#3e2723] rounded-b-3xl rounded-t-xl relative shadow-[inset_-15px_0_30px_rgba(0,0,0,0.4),0_20px_40px_rgba(0,0,0,0.3)] flex flex-col items-center justify-center overflow-hidden">
-           
+      {/* --- BOTTOM TIER (Happy Birthday) --- */}
+      <div className="relative z-10 flex flex-col items-center -mt-4">
+        <div className="w-80 md:w-96 h-36 bg-[#880e4f] rounded-b-3xl rounded-t-xl relative shadow-[inset_-20px_0_50px_rgba(0,0,0,0.4),0_20px_50px_rgba(0,0,0,0.4)] flex flex-col items-center justify-center">
            {/* Top Rim */}
-           <div className="absolute -top-4 w-full h-8 bg-[#4e342e] rounded-[50%] shadow-sm border-b border-white/5"></div>
-
-           {/* Texture */}
-           <div className="absolute inset-0 texture-noise mix-blend-overlay opacity-30"></div>
+           <div className="absolute -top-5 w-full h-10 bg-[#ad1457] rounded-[50%] shadow-md border-b border-white/10"></div>
            
-           {/* Elegant Gold Writing */}
-           <div className="relative z-10 text-center transform -rotate-2 mix-blend-screen">
-              <h1 className="font-handwriting text-5xl text-[#ffd700] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-90 leading-tight">Happy</h1>
-              <h1 className="font-handwriting text-6xl text-[#ffd700] drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-90 leading-tight mt-[-10px]">Birthday</h1>
+           {/* Text */}
+           <div className="relative z-10 text-center mt-2">
+              <span className="block font-serif text-amber-100 text-3xl tracking-[0.2em] uppercase opacity-90 drop-shadow-md">Happy</span>
+              <span className="block font-serif text-amber-100 text-3xl tracking-[0.2em] uppercase opacity-90 drop-shadow-md">Birthday</span>
            </div>
 
-           {/* Bottom Piping */}
-           <div className="absolute bottom-0 w-full flex justify-center gap-1 opacity-90">
-             {[...Array(18)].map((_, i) => (
-               <div key={i} className="w-6 h-6 bg-[#5d4037] rounded-full shadow-[inset_-2px_-2px_4px_rgba(0,0,0,0.3)] -mb-3"></div>
+           {/* Bottom Frills */}
+           <div className="absolute bottom-0 w-full flex justify-center gap-1 opacity-100">
+             {[...Array(20)].map((_, i) => (
+               <div key={i} className="w-5 h-5 bg-white rounded-full shadow-[0_-2px_5px_rgba(0,0,0,0.1)] -mb-2.5"></div>
              ))}
            </div>
         </div>
       </div>
 
-      {/* --- LUXURY PLATE --- */}
-      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-[500px] h-12 bg-gray-100 rounded-[50%] z-0 shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_-5px_10px_rgba(0,0,0,0.1)] border border-gray-300/50">
-        <div className="absolute inset-2 border border-yellow-400/30 rounded-[50%]"></div>
-      </div>
+      {/* --- PLATE --- */}
+      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-[110%] h-12 bg-white rounded-[50%] z-0 shadow-[0_20px_60px_rgba(0,0,0,0.6)] border-4 border-gray-200"></div>
 
     </div>
   );
 };
 
-// --- APP ---
+// --- APP COMPONENT ---
 
 const App = () => {
   const TOTAL_CANDLES = 17;
@@ -433,30 +414,32 @@ const App = () => {
   const [isWon, setIsWon] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   
-  const { isBlowing, intensity, startListening, stopListening } = useBlowDetection();
+  const { isBlowing, startListening, stopListening } = useBlowDetection();
 
+  // Resize handler
   useEffect(() => {
-    const r = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener('resize', r);
-    return () => window.removeEventListener('resize', r);
+    const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Handle Start
   const handleStart = async () => {
     await startListening();
     setHasStarted(true);
   };
 
-  // Candle Extinguishing Logic
+  // Candle Audio Effect
   const prevLitCount = useRef(TOTAL_CANDLES);
   useEffect(() => {
     const currentLitCount = candlesLit.filter(c => c).length;
     if (currentLitCount < prevLitCount.current) {
-      playExtinguishSound(); // WHOOSH sound
+      playExtinguishSound();
       prevLitCount.current = currentLitCount;
     }
   }, [candlesLit]);
 
-  // Blowing Physics
+  // Blowing Logic (Refined for "Less Sensitive" + Cluster)
   useEffect(() => {
     if (!hasStarted || isWon) return;
 
@@ -465,10 +448,10 @@ const App = () => {
         const litIndices = prev.map((lit, i) => lit ? i : -1).filter(i => i !== -1);
         if (litIndices.length === 0) return prev;
 
-        // "Cluster" extinguishing: if you blow hard, adjacent candles go out
-        const amount = Math.ceil(intensity * 4); 
-        const newCandles = [...prev];
+        // If blowing is detected (passed threshold), blow out 1-2 random candles
+        const amount = Math.floor(Math.random() * 2) + 1; 
         
+        const newCandles = [...prev];
         for (let i = 0; i < amount; i++) {
           if (litIndices.length === 0) break;
           const r = Math.floor(Math.random() * litIndices.length);
@@ -479,9 +462,9 @@ const App = () => {
         return newCandles;
       });
     }
-  }, [isBlowing, intensity, hasStarted, isWon]);
+  }, [isBlowing, hasStarted, isWon]);
 
-  // Win Logic
+  // Win Condition
   useEffect(() => {
     if (hasStarted && !isWon && candlesLit.every(lit => !lit)) {
       setIsWon(true);
@@ -491,56 +474,63 @@ const App = () => {
   }, [candlesLit, hasStarted, isWon, stopListening]);
 
   return (
-    <div className="min-h-screen w-full relative overflow-hidden text-slate-100 font-sans selection:bg-pink-500/30">
+    <div className="min-h-screen w-full relative text-slate-100 font-sans overflow-hidden">
       
-      <Background />
+      {/* 1. High Fidelity Background (Canvas) */}
+      <DecorationsCanvas />
 
+      {/* 2. Confetti on Win */}
       {isWon && (
         <Confetti 
           width={windowSize.width} 
           height={windowSize.height} 
-          numberOfPieces={1000} 
-          recycle={false} 
-          colors={['#FFC107', '#FF4081', '#E040FB', '#7C4DFF', '#536DFE']}
+          numberOfPieces={500} 
+          recycle={true} 
+          gravity={0.15}
         />
       )}
 
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen pb-20">
+      {/* 3. Main Content Layer */}
+      <div className="relative z-10 flex flex-col items-center min-h-screen">
         
-        {/* UI Container */}
-        <div className="absolute top-10 w-full max-w-2xl px-4 text-center z-50">
+        {/* Floating Headers */}
+        <div className="mt-12 md:mt-8 px-4 text-center z-50 w-full max-w-lg">
            <AnimatePresence mode="wait">
              
              {!hasStarted ? (
                <motion.div 
                   key="start"
-                  initial={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="glass-panel p-8 rounded-2xl shadow-2xl flex flex-col items-center"
+                  className="glass-panel p-8 rounded-3xl"
                >
-                 <div className="w-20 h-20 bg-gradient-to-tr from-pink-400 to-purple-500 rounded-full flex items-center justify-center mb-6 shadow-lg animate-pulse">
-                    <Icons.Sparkles size={40} className="text-white" />
+                 <div className="mb-4 flex justify-center">
+                   <div className="p-4 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full shadow-lg animate-pulse">
+                     <Icons.Sparkles size={32} />
+                   </div>
                  </div>
-                 <h1 className="text-4xl font-bold text-slate-800 mb-2">A Special Surprise</h1>
-                 <p className="text-slate-600 mb-8 text-lg">For the most classy birthday celebration. <br/> Please enable your microphone.</p>
+                 <h1 className="text-3xl font-bold text-white mb-2 font-handwriting">For Reechita ❤️</h1>
+                 <p className="text-pink-100 mb-6 text-sm md:text-base">
+                   A magical cake for a magical person. <br/>
+                   Enable microphone to make a wish.
+                 </p>
                  <button 
                    onClick={handleStart}
-                   className="group px-10 py-4 bg-slate-900 text-white rounded-full font-semibold text-lg shadow-xl hover:bg-slate-800 transition-all flex items-center gap-3 active:scale-95"
+                   className="w-full py-4 bg-white text-pink-600 rounded-xl font-bold text-lg shadow-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
                  >
-                   <Icons.Mic size={20} className="group-hover:text-pink-400 transition-colors" /> 
-                   Begin the Experience
+                   <Icons.Mic size={24} /> Make a Wish
                  </button>
                </motion.div>
              ) : !isWon ? (
                 <motion.div 
-                   key="playing"
+                   key="blowing"
                    initial={{ opacity: 0 }}
                    animate={{ opacity: 1 }}
                    exit={{ opacity: 0 }}
-                   className="glass-panel px-8 py-4 rounded-full inline-block"
+                   className="glass-panel px-6 py-3 rounded-full inline-block"
                 >
-                   <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 tracking-wider">
-                     BLOW OUT THE CANDLES 🌬️
+                   <h2 className="text-lg md:text-xl font-bold text-white tracking-widest animate-pulse">
+                     BLOW THE CANDLES! 🌬️
                    </h2>
                 </motion.div>
              ) : (
@@ -548,14 +538,14 @@ const App = () => {
                   key="won"
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", duration: 1.5 }}
-                  className="glass-panel p-10 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-2 border-yellow-200/50"
+                  transition={{ type: "spring", bounce: 0.5 }}
+                  className="glass-panel p-8 rounded-3xl border-2 border-yellow-300/30"
                 >
-                  <h1 className="font-handwriting text-8xl gold-text drop-shadow-sm mb-6">
+                  <h1 className="font-handwriting text-5xl md:text-7xl gold-text mb-4 drop-shadow-2xl">
                     Happy Birthday!
                   </h1>
-                  <p className="text-2xl text-slate-700 italic font-serif leading-relaxed">
-                    "May your year be as exquisite as this cake and as bright as the candles you just blew out. <br/> I love you deeply."
+                  <p className="text-lg text-pink-50 italic">
+                    "To Reechita, <br/> May your life be as sweet as this cake and filled with endless love. I love you!"
                   </p>
                 </motion.div>
              )}
@@ -563,11 +553,12 @@ const App = () => {
            </AnimatePresence>
         </div>
 
-        {/* CAKE RENDER */}
+        {/* 4. The 3D Cake */}
         <motion.div
+           className="mt-auto mb-20 md:mb-32"
            animate={{ 
-             y: isWon ? 100 : 0, 
-             scale: isWon ? 1.05 : 1
+             y: isWon ? 50 : 0, 
+             scale: isWon ? 1.1 : 1
            }}
            transition={{ duration: 1.5, ease: "anticipate" }}
         >
