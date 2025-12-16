@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ReactDOM from 'react-dom/client';
-import { motion, AnimatePresence } from 'framer-motion';
-import Confetti from 'react-confetti';
-import { Sparkles, Mic } from 'lucide-react';
+// --- GLOBALS ---
+// Since we loaded libraries in HTML, we access them here
+const { useState, useEffect, useRef, useCallback } = React;
+const { motion, AnimatePresence } = window.Motion;
+const Confetti = window.ReactConfetti;
+const { Sparkles, Mic } = window.lucideReact;
 
 // --- 1. HOOK: Microphone Detection ---
 const useBlowDetection = () => {
@@ -63,7 +64,7 @@ const useBlowDetection = () => {
       checkAudio();
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      throw error;
+      alert("Please allow microphone access to blow out the candles!");
     }
   }, []);
 
@@ -204,70 +205,78 @@ const getAudioContext = () => {
 };
 
 const playPuffSound = () => {
-  const ctx = getAudioContext();
-  if (ctx.state === 'suspended') ctx.resume();
-  
-  const t = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  
-  // White noise buffer
-  const bufferSize = ctx.sampleRate * 0.15;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-  
-  const noise = ctx.createBufferSource();
-  noise.buffer = buffer;
-  
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(1000, t);
-  
-  noise.connect(filter);
-  filter.connect(gain);
-  gain.connect(ctx.destination);
-  
-  gain.gain.setValueAtTime(0.5, t);
-  gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-  
-  noise.start(t);
-  noise.stop(t + 0.15);
-};
-
-const playWinTune = () => {
-  const ctx = getAudioContext();
-  if (ctx.state === 'suspended') ctx.resume();
-
-  const now = ctx.currentTime;
-  const notes = [
-    { f: 261.63, d: 0.25, t: 0 },    // C4
-    { f: 261.63, d: 0.25, t: 0.25 }, // C4
-    { f: 293.66, d: 0.5,  t: 0.5 },  // D4
-    { f: 261.63, d: 0.5,  t: 1.0 },  // C4
-    { f: 349.23, d: 0.5,  t: 1.5 },  // F4
-    { f: 329.63, d: 1.0,  t: 2.0 },  // E4
-  ];
-
-  notes.forEach(({ f, d, t }) => {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    
+    const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     
-    osc.type = 'triangle';
-    osc.frequency.value = f;
+    // White noise buffer
+    const bufferSize = ctx.sampleRate * 0.15;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
     
-    gain.gain.setValueAtTime(0.1, now + t);
-    gain.gain.linearRampToValueAtTime(0.1, now + t + d - 0.05);
-    gain.gain.linearRampToValueAtTime(0, now + t + d);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
     
-    osc.connect(gain);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1000, t);
+    
+    noise.connect(filter);
+    filter.connect(gain);
     gain.connect(ctx.destination);
     
-    osc.start(now + t);
-    osc.stop(now + t + d);
-  });
+    gain.gain.setValueAtTime(0.5, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    
+    noise.start(t);
+    noise.stop(t + 0.15);
+  } catch (e) {
+    console.warn("Audio play failed", e);
+  }
+};
+
+const playWinTune = () => {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const now = ctx.currentTime;
+    // Simple celebratory melody
+    const notes = [
+      { f: 523.25, d: 0.2 }, // C
+      { f: 659.25, d: 0.2 }, // E
+      { f: 783.99, d: 0.2 }, // G
+      { f: 1046.50, d: 0.4 }, // High C
+    ];
+
+    let time = now;
+    notes.forEach(({ f, d }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      
+      gain.gain.setValueAtTime(0.1, time);
+      gain.gain.linearRampToValueAtTime(0, time + d);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(time);
+      osc.stop(time + d);
+      time += d;
+    });
+  } catch (e) {
+    console.warn("Audio play failed", e);
+  }
 };
 
 // --- 5. MAIN APP COMPONENT ---
@@ -293,6 +302,7 @@ const App = () => {
       await startAudio();
       setHasStarted(true);
     } catch (e) {
+      console.error(e);
       alert("Microphone access is needed to blow out the candles!");
     }
   };
