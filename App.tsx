@@ -7,43 +7,83 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const TOTAL_CANDLES = 17;
 
-// --- Sound Utilities (Synthesizers) ---
-const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+// --- Audio Synthesizer Logic ---
+// We initialize this lazily to respect browser autoplay policies
+let audioCtx: AudioContext | null = null;
+
+const getAudioContext = () => {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  return audioCtx;
+};
 
 const playPuffSound = () => {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 seconds
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  
+  // Create a noise-like effect for "puff"
+  const bufferSize = ctx.sampleRate * 0.15;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1; // White noise
+    data[i] = Math.random() * 2 - 1;
   }
-  const noise = audioCtx.createBufferSource();
+  
+  const noise = ctx.createBufferSource();
   noise.buffer = buffer;
-  const gainNode = audioCtx.createGain();
-  gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-  noise.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-  noise.start();
+  
+  // Filter to make it sound more like breath
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(1000, t);
+  
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  
+  gain.gain.setValueAtTime(0.5, t);
+  gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+  
+  noise.start(t);
+  noise.stop(t + 0.15);
 };
 
 const playWinTune = () => {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  const notes = [523.25, 659.25, 783.99, 1046.50]; // C, E, G, C
-  notes.forEach((freq, i) => {
-    setTimeout(() => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.5);
-    }, i * 150);
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') ctx.resume();
+
+  const now = ctx.currentTime;
+  // Simple "Happy Birthday" beginning notes
+  const notes = [
+    { f: 261.63, d: 0.25, t: 0 },    // C4
+    { f: 261.63, d: 0.25, t: 0.25 }, // C4
+    { f: 293.66, d: 0.5,  t: 0.5 },  // D4
+    { f: 261.63, d: 0.5,  t: 1.0 },  // C4
+    { f: 349.23, d: 0.5,  t: 1.5 },  // F4
+    { f: 329.63, d: 1.0,  t: 2.0 },  // E4
+  ];
+
+  notes.forEach(({ f, d, t }) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.value = f;
+    
+    gain.gain.setValueAtTime(0.1, now + t);
+    gain.gain.linearRampToValueAtTime(0.1, now + t + d - 0.05);
+    gain.gain.linearRampToValueAtTime(0, now + t + d);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start(now + t);
+    osc.stop(now + t + d);
   });
 };
 
@@ -53,17 +93,15 @@ const App: React.FC = () => {
   const [isWon, setIsWon] = useState(false);
   const [birthdayMessage, setBirthdayMessage] = useState<string>("");
   
-  // Audio detection hook
   const { isBlowing, intensity, startAudio, stopAudio } = useBlowDetection();
 
   const handleStart = async () => {
     try {
+      getAudioContext().resume(); // Initialize audio context on user gesture
       await startAudio();
       setHasStarted(true);
-      // Resume audio context for output if needed
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
     } catch (e) {
-      alert("We need microphone access to detect you blowing out the candles! Please refresh and allow permissions.");
+      alert("Microphone access is needed to blow out the candles!");
     }
   };
 
@@ -77,18 +115,16 @@ const App: React.FC = () => {
     }
   }, [candlesLit]);
 
-  // Game logic: Extinguish candles based on blow intensity
+  // Game logic
   useEffect(() => {
     if (!hasStarted || isWon) return;
 
     if (isBlowing) {
       setCandlesLit((prev) => {
         const litIndices = prev.map((lit, i) => lit ? i : -1).filter(i => i !== -1);
-        
         if (litIndices.length === 0) return prev;
 
-        // The stronger the blow, the more candles go out
-        const candlesToExtinguishCount = Math.max(1, Math.ceil(intensity * 3)); 
+        const candlesToExtinguishCount = Math.max(1, Math.ceil(intensity * 4)); 
         const newCandles = [...prev];
         
         for (let i = 0; i < candlesToExtinguishCount; i++) {
@@ -103,12 +139,12 @@ const App: React.FC = () => {
     }
   }, [isBlowing, intensity, hasStarted, isWon]);
 
-  // Check win condition
+  // Win condition
   useEffect(() => {
     if (hasStarted && !isWon && candlesLit.every(lit => !lit)) {
       setIsWon(true);
       stopAudio();
-      playWinTune();
+      setTimeout(() => playWinTune(), 500); // Slight delay for effect
       setBirthdayMessage("Happy Birthday! 🎉 May your day be as sweet as this cake and filled with all the love you deserve! I love you! ❤️");
     }
   }, [candlesLit, hasStarted, isWon, stopAudio]);
@@ -116,14 +152,14 @@ const App: React.FC = () => {
   const { width, height } = useWindowSize();
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-pink-100 to-purple-200">
+    <div className="min-h-screen relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-pink-100 to-purple-200 font-sans">
       {isWon && <Confetti width={width} height={height} numberOfPieces={500} recycle={false} />}
       
       {!hasStarted ? (
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="z-10 text-center p-8 bg-white/80 backdrop-blur-md rounded-3xl shadow-xl max-w-md mx-4 transform border border-pink-200"
+          className="z-10 text-center p-8 bg-white/80 backdrop-blur-md rounded-3xl shadow-xl max-w-md mx-4 border border-pink-200"
         >
           <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-6 text-pink-500">
              <Sparkles size={40} />
@@ -142,25 +178,33 @@ const App: React.FC = () => {
           </button>
         </motion.div>
       ) : (
-        <div className="flex flex-col items-center justify-between w-full h-full min-h-[80vh] py-10 z-10">
+        <div className="flex flex-col items-center justify-between w-full h-full min-h-[85vh] py-10 z-10">
           
-          {/* Header Message */}
-          <div className="text-center px-4 min-h-[160px] flex items-end justify-center">
+          {/* Dynamic Header Message */}
+          <div className="text-center px-4 min-h-[200px] flex flex-col items-center justify-center z-30">
              <AnimatePresence mode='wait'>
                {isWon && (
                  <motion.div
-                   initial={{ scale: 0, rotate: -10 }}
-                   animate={{ scale: 1, rotate: 0 }}
-                   transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                   initial={{ scale: 0.5, opacity: 0 }}
+                   animate={{ scale: 1, opacity: 1 }}
+                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                   className="flex flex-col items-center"
                  >
-                   <h1 className="font-handwriting text-5xl md:text-7xl text-pink-600 mb-4 drop-shadow-sm">
+                   <motion.h1 
+                     className="font-handwriting text-5xl md:text-8xl text-pink-600 mb-6 drop-shadow-md text-center leading-tight"
+                     animate={{ 
+                       rotate: [0, -2, 2, -2, 0],
+                       scale: [1, 1.02, 1, 1.02, 1] 
+                     }}
+                     transition={{ duration: 3, repeat: Infinity }}
+                   >
                      Happy Birthday!
-                   </h1>
+                   </motion.h1>
                    <motion.div 
-                      initial={{ y: 20, opacity: 0 }}
+                      initial={{ y: 50, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.5 }}
-                      className="text-lg md:text-xl text-slate-700 max-w-2xl mx-auto italic bg-white/60 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-pink-100"
+                      transition={{ delay: 0.5, duration: 0.8 }}
+                      className="text-xl md:text-2xl text-slate-700 max-w-2xl text-center italic bg-white/70 backdrop-blur-md p-8 rounded-2xl shadow-xl border-2 border-pink-200"
                    >
                      {birthdayMessage}
                    </motion.div>
@@ -169,34 +213,31 @@ const App: React.FC = () => {
              </AnimatePresence>
           </div>
 
-          {/* Main Cake Area */}
+          {/* Cake Component */}
           <motion.div 
-            className="relative mt-8 md:mt-0"
-            animate={{ scale: isWon ? 1.1 : 1 }}
-            transition={{ duration: 1 }}
+            className="relative mt-auto mb-10"
+            animate={{ scale: isWon ? 1.1 : 1, y: isWon ? 20 : 0 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
           >
              <Cake candlesLit={candlesLit} />
           </motion.div>
 
-          {/* Footer Instruction */}
-          <div className="h-16 mt-12 flex items-center justify-center">
-            {!isWon && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center bg-white/60 backdrop-blur-sm px-6 py-3 rounded-full text-pink-800 font-semibold shadow-sm animate-bounce"
-              >
-                Blow into your microphone to extinguish the candles! 🌬️🎂
-              </motion.div>
-            )}
-          </div>
+          {/* Instructions */}
+          {!isWon && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 text-center bg-white/60 backdrop-blur-sm px-6 py-3 rounded-full text-pink-800 font-semibold shadow-sm animate-bounce"
+            >
+              Blow into your microphone to extinguish the candles! 🌬️🎂
+            </motion.div>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-// Helper hook for window size
 function useWindowSize() {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   useEffect(() => {
