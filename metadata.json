@@ -1,7 +1,0 @@
-{
-  "name": "Birthday Blowout",
-  "description": "A magical interactive birthday cake where you blow out the candles using your microphone!",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
