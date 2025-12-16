@@ -35,7 +35,6 @@ export const useBlowDetection = () => {
         analyserRef.current.getByteFrequencyData(dataArrayRef.current);
         
         // Blowing creates low-frequency noise. We focus on the lower spectrum.
-        // We take the average of the lower half of the frequency data.
         let sum = 0;
         const lowerHalfCount = Math.floor(dataArrayRef.current.length / 2);
         for (let i = 0; i < lowerHalfCount; i++) {
@@ -43,13 +42,11 @@ export const useBlowDetection = () => {
         }
         const average = sum / lowerHalfCount;
 
-        // Threshold for "blowing". Adjust as needed. 
-        // 40 is a reasonable baseline for a moderate blow close to the mic.
+        // Threshold for "blowing". 
         const THRESHOLD = 40; 
         
         if (average > THRESHOLD) {
           setIsBlowing(true);
-          // Normalized intensity 0-1 (roughly)
           setIntensity(Math.min((average - THRESHOLD) / 50, 1));
         } else {
           setIsBlowing(false);
