@@ -1,100 +1,135 @@
-/* --- LUXURY COLOR PALETTE --- */
 :root {
   --velvet-maroon: #5d001e;
   --gold-primary: #d4af37;
   --gold-light: #f9f295;
   --cream-luxe: #fffcf2;
   --rose-accent: #e4717a;
+  --room-floor: #2a1a12;
 }
 
 body {
   font-family: 'Quicksand', sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #0d0208; /* Deep Obsidian */
+  background: #1a0f12; /* Fallback */
   color: #fff;
   overflow: hidden;
   height: 100vh;
   width: 100vw;
 }
 
-.font-handwriting {
-  font-family: 'Pacifico', cursive;
+/* --- LUXURY ROOM BACKGROUND --- */
+.room-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, #2d1b1e 0%, #1a0f12 70%);
 }
 
-/* --- RESPONSIVE STAGE --- */
-#root {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* --- THE CAKE CONTAINER (3D STAGE) --- */
-.cake-stage {
-  position: relative;
-  perspective: 1500px;
-  transform-style: preserve-3d;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  /* Scaled by JS based on height/width */
-  transform-origin: bottom center; 
-}
-
-/* --- LUXURY TEXTURES --- */
-.velvet-texture {
-  background: radial-gradient(circle at top left, #8b0000, #4a0000);
-  box-shadow: 
-    inset 0 20px 30px rgba(0,0,0,0.5),
-    inset 0 -10px 20px rgba(255,255,255,0.1);
-  position: relative;
-}
-
-.velvet-texture::after {
-  content: '';
+.room-wall-pattern {
   position: absolute;
   inset: 0;
-  background-image: url("https://www.transparenttextures.com/patterns/black-linen.png");
-  opacity: 0.2;
-  pointer-events: none;
+  background-image: radial-gradient(circle at 2px 2px, rgba(212, 175, 55, 0.05) 1px, transparent 0);
+  background-size: 40px 40px;
 }
 
-.icing-rim {
-  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+.room-floor {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 30vh;
+  background: linear-gradient(to top, #150a0d, var(--room-floor));
+  transform: perspective(1000px) rotateX(40deg);
+  transform-origin: bottom;
+  box-shadow: inset 0 50px 100px rgba(0,0,0,0.8);
 }
 
-/* --- 3D GOLD TEXT --- */
+/* --- BALLOONS & STRINGS --- */
+.balloon-string {
+  stroke: #000;
+  stroke-width: 1.5;
+  fill: none;
+}
+
+/* --- 3D FOLDING CARD --- */
+.card-perspective {
+  perspective: 2000px;
+}
+
+.card-container {
+  width: 320px;
+  height: 450px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-front, .card-inside {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 15px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+.card-front {
+  background: linear-gradient(135deg, #fffcf2, #f5e6ca);
+  border: 4px solid var(--gold-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transform-origin: left;
+}
+
+.card-inside {
+  background: #fffcf2;
+  transform: rotateY(180deg);
+  padding: 2rem;
+  color: #5d001e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.card-container.open .card-front {
+  transform: rotateY(-140deg);
+}
+
+/* --- KNIFE ANIMATION --- */
+.knife {
+  width: 120px;
+  height: 15px;
+  background: linear-gradient(to bottom, #ddd, #999);
+  border-radius: 2px 20px 20px 2px;
+  position: absolute;
+  z-index: 100;
+  box-shadow: 5px 5px 10px rgba(0,0,0,0.3);
+}
+
+.cake-slice-present {
+  filter: drop-shadow(0 30px 50px rgba(0,0,0,0.8));
+}
+
+/* --- TEXT STYLES --- */
 .gold-3d {
   background: linear-gradient(to bottom, #cfc09f 22%, #634f2c 24%, #cfc09f 26%, #cfc09f 27%, #ffecb3 40%, #3a2c0f 78%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,1));
-  font-weight: bold;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));
 }
 
-/* --- GLASS UI --- */
-.luxury-glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 2rem;
-  box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+.font-handwriting {
+  font-family: 'Pacifico', cursive;
 }
 
-/* --- ANIMATIONS --- */
-@keyframes flame-flicker {
-  0% { transform: scale(1) rotate(-1deg); filter: blur(0px); opacity: 0.8; }
-  50% { transform: scale(1.1) rotate(1deg); filter: blur(1px); opacity: 1; }
-  100% { transform: scale(0.95) rotate(-0.5deg); filter: blur(0px); opacity: 0.9; }
-}
-
-.animate-flame {
-  animation: flame-flicker 0.1s infinite alternate;
-}
-
-/* Mobile Adjustments */
 @media (max-width: 640px) {
-  .cake-stage {
-    transform: scale(0.7);
+  .card-container {
+    width: 280px;
+    height: 400px;
   }
 }
