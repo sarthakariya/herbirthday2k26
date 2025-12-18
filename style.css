@@ -1,135 +1,197 @@
 :root {
-  --velvet-maroon: #5d001e;
-  --gold-primary: #d4af37;
-  --gold-light: #f9f295;
-  --cream-luxe: #fffcf2;
-  --rose-accent: #e4717a;
-  --room-floor: #2a1a12;
+  --gold: #d4af37;
+  --cream: #fffcf2;
+  --white-luxe: #ffffff;
+  --pink-luxe: #ff85a1;
+  --room-shadow: rgba(0,0,0,0.05);
 }
 
 body {
   font-family: 'Quicksand', sans-serif;
   margin: 0;
   padding: 0;
-  background: #1a0f12; /* Fallback */
-  color: #fff;
+  background: #f8f9fa;
+  color: #333;
   overflow: hidden;
   height: 100vh;
   width: 100vw;
 }
 
-/* --- LUXURY ROOM BACKGROUND --- */
+/* --- BRIGHT LUXURY ROOM --- */
 .room-background {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(to bottom, #2d1b1e 0%, #1a0f12 70%);
+  background: radial-gradient(circle at center, #ffffff 0%, #f0f0f0 100%);
 }
 
-.room-wall-pattern {
+.room-wall-paneling {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle at 2px 2px, rgba(212, 175, 55, 0.05) 1px, transparent 0);
-  background-size: 40px 40px;
+  background-image: linear-gradient(to right, var(--room-shadow) 1px, transparent 1px),
+                    linear-gradient(to bottom, var(--room-shadow) 1px, transparent 1px);
+  background-size: 100px 100px;
+  opacity: 0.3;
 }
 
 .room-floor {
   position: absolute;
   bottom: 0;
   width: 100%;
-  height: 30vh;
-  background: linear-gradient(to top, #150a0d, var(--room-floor));
-  transform: perspective(1000px) rotateX(40deg);
+  height: 35vh;
+  background: #ffffff;
+  transform: perspective(1000px) rotateX(60deg);
   transform-origin: bottom;
-  box-shadow: inset 0 50px 100px rgba(0,0,0,0.8);
+  box-shadow: inset 0 100px 150px rgba(0,0,0,0.02);
+  border-top: 2px solid #eee;
 }
 
-/* --- BALLOONS & STRINGS --- */
-.balloon-string {
-  stroke: #000;
-  stroke-width: 1.5;
-  fill: none;
+/* --- 3D CAKE ARCHITECTURE --- */
+.cake-container-3d {
+  position: relative;
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-/* --- 3D FOLDING CARD --- */
+.tier {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s ease;
+}
+
+.tier-top {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) rotateX(0deg);
+  border-radius: 50%;
+  background: var(--cream);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+  z-index: 2;
+}
+
+.tier-side {
+  position: relative;
+  background: linear-gradient(to bottom, #fff, #f0f0f0);
+  border-radius: 0 0 50% 50% / 0 0 20% 20%;
+  z-index: 1;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  filter: blur(1px);
+  animation: sparkle-anim 2s infinite;
+}
+
+@keyframes sparkle-anim {
+  0%, 100% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+/* --- CANDLE FLAME --- */
+.flame {
+  width: 12px;
+  height: 20px;
+  background: radial-gradient(ellipse at bottom, #fff 0%, #ffeb3b 40%, #ff9800 70%, #f44336 100%);
+  border-radius: 50% 50% 20% 20%;
+  filter: blur(0.5px);
+  animation: dynamic-flicker 0.15s infinite alternate;
+  transform-origin: bottom center;
+}
+
+@keyframes dynamic-flicker {
+  0% { transform: scale(1) rotate(-2deg) skewX(2deg); opacity: 0.9; }
+  100% { transform: scale(1.1) rotate(2deg) skewX(-2deg); opacity: 1; }
+}
+
+/* --- CARD ANIMATIONS --- */
 .card-perspective {
-  perspective: 2000px;
+  perspective: 2500px;
 }
 
 .card-container {
-  width: 320px;
-  height: 450px;
+  width: 350px;
+  height: 480px;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card-front, .card-inside {
+.card-half {
   position: absolute;
   width: 100%;
   height: 100%;
   backface-visibility: hidden;
-  border-radius: 15px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  border-radius: 12px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.2);
 }
 
 .card-front {
-  background: linear-gradient(135deg, #fffcf2, #f5e6ca);
-  border: 4px solid var(--gold-primary);
+  background: linear-gradient(135deg, #ff85a1, #fd3a69);
+  z-index: 2;
+  transform-origin: left;
+  transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 2;
-  transform-origin: left;
+  color: white;
+  border: 5px solid white;
 }
 
-.card-inside {
-  background: #fffcf2;
-  transform: rotateY(180deg);
-  padding: 2rem;
-  color: #5d001e;
+.card-back {
+  background: #fff;
+  z-index: 1;
+  padding: 30px;
+  color: #d63384;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  border: 1px solid #eee;
 }
 
 .card-container.open .card-front {
-  transform: rotateY(-140deg);
+  transform: rotateY(-150deg);
 }
 
-/* --- KNIFE ANIMATION --- */
+/* --- KNIFE --- */
 .knife {
-  width: 120px;
-  height: 15px;
-  background: linear-gradient(to bottom, #ddd, #999);
-  border-radius: 2px 20px 20px 2px;
+  width: 150px;
+  height: 20px;
+  background: linear-gradient(to bottom, #e0e0e0, #9e9e9e);
+  border-radius: 2px 40px 40px 2px;
   position: absolute;
-  z-index: 100;
-  box-shadow: 5px 5px 10px rgba(0,0,0,0.3);
+  z-index: 500;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
-.cake-slice-present {
-  filter: drop-shadow(0 30px 50px rgba(0,0,0,0.8));
+/* --- UI COMPONENTS --- */
+.luxury-glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.5);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
 }
 
-/* --- TEXT STYLES --- */
-.gold-3d {
-  background: linear-gradient(to bottom, #cfc09f 22%, #634f2c 24%, #cfc09f 26%, #cfc09f 27%, #ffecb3 40%, #3a2c0f 78%);
+.gold-text {
+  background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fcf6ba, #aa771c);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));
-}
-
-.font-handwriting {
-  font-family: 'Pacifico', cursive;
+  font-weight: bold;
 }
 
 @media (max-width: 640px) {
   .card-container {
-    width: 280px;
-    height: 400px;
+    width: 300px;
+    height: 420px;
   }
 }
