@@ -1,162 +1,100 @@
+/* --- LUXURY COLOR PALETTE --- */
+:root {
+  --velvet-maroon: #5d001e;
+  --gold-primary: #d4af37;
+  --gold-light: #f9f295;
+  --cream-luxe: #fffcf2;
+  --rose-accent: #e4717a;
+}
+
 body {
   font-family: 'Quicksand', sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #1e1b2e; /* Deep luxury purple/dark base */
-  overflow: hidden; /* Prevent scrolling, handle in canvas */
+  background-color: #0d0208; /* Deep Obsidian */
+  color: #fff;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
 }
 
 .font-handwriting {
   font-family: 'Pacifico', cursive;
 }
 
-/* --- ADVANCED 3D TEXTURE UTILITIES --- */
-.texture-sponge {
-  background-image: 
-    radial-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
-    radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px);
-  background-size: 4px 4px, 6px 6px;
-  background-position: 0 0, 3px 3px;
+/* --- RESPONSIVE STAGE --- */
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.texture-cream {
-  background-image: 
-    linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05) 75%, transparent 75%, transparent);
-  background-size: 20px 20px;
+/* --- THE CAKE CONTAINER (3D STAGE) --- */
+.cake-stage {
+  position: relative;
+  perspective: 1500px;
+  transform-style: preserve-3d;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  /* Scaled by JS based on height/width */
+  transform-origin: bottom center; 
 }
 
-/* --- ICING TEXT EFFECT --- */
-.icing-text {
-  color: #fff;
-  text-shadow: 
-    0 1px 0 #ccc,
-    0 2px 0 #c9c9c9,
-    0 3px 0 #bbb,
-    0 4px 0 #b9b9b9,
-    0 5px 0 #aaa,
-    0 6px 1px rgba(0,0,0,.1),
-    0 0 5px rgba(0,0,0,.1),
-    0 1px 3px rgba(0,0,0,.3),
-    0 3px 5px rgba(0,0,0,.2),
-    0 5px 10px rgba(0,0,0,.25),
-    0 10px 10px rgba(0,0,0,.2),
-    0 20px 20px rgba(0,0,0,.15);
+/* --- LUXURY TEXTURES --- */
+.velvet-texture {
+  background: radial-gradient(circle at top left, #8b0000, #4a0000);
+  box-shadow: 
+    inset 0 20px 30px rgba(0,0,0,0.5),
+    inset 0 -10px 20px rgba(255,255,255,0.1);
+  position: relative;
+}
+
+.velvet-texture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("https://www.transparenttextures.com/patterns/black-linen.png");
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.icing-rim {
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+}
+
+/* --- 3D GOLD TEXT --- */
+.gold-3d {
+  background: linear-gradient(to bottom, #cfc09f 22%, #634f2c 24%, #cfc09f 26%, #cfc09f 27%, #ffecb3 40%, #3a2c0f 78%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,1));
+  font-weight: bold;
+}
+
+/* --- GLASS UI --- */
+.luxury-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2rem;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.5);
 }
 
 /* --- ANIMATIONS --- */
-@keyframes flicker {
-  0% { opacity: 0.9; transform: scale(1) skewX(0deg); filter: blur(0px); }
-  25% { opacity: 1; transform: scale(1.1) skewX(2deg); filter: blur(1px); }
-  50% { opacity: 0.8; transform: scale(0.9) skewX(-2deg); filter: blur(0px); }
-  75% { opacity: 1; transform: scale(1.05) skewX(1deg); filter: blur(1px); }
-  100% { opacity: 0.9; transform: scale(1) skewX(0deg); filter: blur(0px); }
+@keyframes flame-flicker {
+  0% { transform: scale(1) rotate(-1deg); filter: blur(0px); opacity: 0.8; }
+  50% { transform: scale(1.1) rotate(1deg); filter: blur(1px); opacity: 1; }
+  100% { transform: scale(0.95) rotate(-0.5deg); filter: blur(0px); opacity: 0.9; }
 }
 
-.animate-flicker {
-  animation: flicker 0.1s infinite alternate ease-in-out;
+.animate-flame {
+  animation: flame-flicker 0.1s infinite alternate;
 }
 
-/* Glassmorphism Panel */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-}
-
-/* Golden Text Gradient */
-.gold-text {
-  background: linear-gradient(to bottom, #cfc09f 22%, #634f2c 24%, #cfc09f 26%, #cfc09f 27%, #ffecb3 40%, #3a2c0f 78%); 
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #d4af37; 
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));
-}
-
-/* 3D Candle Container */
-.candle-container {
-  transform-style: preserve-3d;
-  perspective: 1000px;
-}
-body {
-  font-family: 'Quicksand', sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #1e1b2e; /* Deep luxury purple/dark base */
-  overflow: hidden; /* Prevent scrolling, handle in canvas */
-}
-
-.font-handwriting {
-  font-family: 'Pacifico', cursive;
-}
-
-/* --- ADVANCED 3D TEXTURE UTILITIES --- */
-.texture-sponge {
-  background-image: 
-    radial-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
-    radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px);
-  background-size: 4px 4px, 6px 6px;
-  background-position: 0 0, 3px 3px;
-}
-
-.texture-cream {
-  background-image: 
-    linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05) 75%, transparent 75%, transparent);
-  background-size: 20px 20px;
-}
-
-/* --- ICING TEXT EFFECT --- */
-.icing-text {
-  color: #fff;
-  text-shadow: 
-    0 1px 0 #ccc,
-    0 2px 0 #c9c9c9,
-    0 3px 0 #bbb,
-    0 4px 0 #b9b9b9,
-    0 5px 0 #aaa,
-    0 6px 1px rgba(0,0,0,.1),
-    0 0 5px rgba(0,0,0,.1),
-    0 1px 3px rgba(0,0,0,.3),
-    0 3px 5px rgba(0,0,0,.2),
-    0 5px 10px rgba(0,0,0,.25),
-    0 10px 10px rgba(0,0,0,.2),
-    0 20px 20px rgba(0,0,0,.15);
-}
-
-/* --- ANIMATIONS --- */
-@keyframes flicker {
-  0% { opacity: 0.9; transform: scale(1) skewX(0deg); filter: blur(0px); }
-  25% { opacity: 1; transform: scale(1.1) skewX(2deg); filter: blur(1px); }
-  50% { opacity: 0.8; transform: scale(0.9) skewX(-2deg); filter: blur(0px); }
-  75% { opacity: 1; transform: scale(1.05) skewX(1deg); filter: blur(1px); }
-  100% { opacity: 0.9; transform: scale(1) skewX(0deg); filter: blur(0px); }
-}
-
-.animate-flicker {
-  animation: flicker 0.1s infinite alternate ease-in-out;
-}
-
-/* Glassmorphism Panel */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-}
-
-/* Golden Text Gradient */
-.gold-text {
-  background: linear-gradient(to bottom, #cfc09f 22%, #634f2c 24%, #cfc09f 26%, #cfc09f 27%, #ffecb3 40%, #3a2c0f 78%); 
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #d4af37; 
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));
-}
-
-/* 3D Candle Container */
-.candle-container {
-  transform-style: preserve-3d;
-  perspective: 1000px;
+/* Mobile Adjustments */
+@media (max-width: 640px) {
+  .cake-stage {
+    transform: scale(0.7);
+  }
 }
